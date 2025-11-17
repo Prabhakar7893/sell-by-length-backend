@@ -17,6 +17,7 @@ function verifyShopifyWebhook(req, rawBody) {
 
 async function adjustInventory(inventoryItemId, metersSold) {
   const endpoint = `https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/inventory_levels/adjust.json`;
+console.log("Webhook triggered");
 
   const response = await fetch(endpoint, {
     method: "POST",
@@ -27,15 +28,14 @@ async function adjustInventory(inventoryItemId, metersSold) {
     body: JSON.stringify({
       inventory_item_id: inventoryItemId,
       location_id: process.env.LOCATION_ID,
-      available_adjustment: -metersSold,
+      available_adjustment: -metersSold
     }),
   });
 
   const data = await response.text();
   console.log("Inventory API Response:", data);
-
-  return data;
 }
+
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
