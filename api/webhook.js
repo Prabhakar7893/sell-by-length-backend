@@ -1,11 +1,5 @@
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
-const crypto = require("crypto");
-const fetch = require("node-fetch");
+import crypto from "crypto";
+import fetch from "node-fetch";
 
 function verifyShopifyWebhook(req, rawBody) {
   const hmacHeader = req.headers["x-shopify-hmac-sha256"];
@@ -42,42 +36,40 @@ async function adjustInventory(inventoryItemId, metersSold) {
 
 export default async function handler(req, res) {
   console.log("Webhook hit!");
-  console.log("API hit!");
-  return res.status(200).json({ message: "API is working!" });
 
-//   if (req.method !== "POST") {
-//     return res.status(405).send("Method Not Allowed");
-//   }
+  if (req.method !== "POST") {
+    return res.status(405).send("Method Not Allowed");
+  }
 
-//   const rawBody = await new Promise((resolve) => {
-//     let data = "";
-//     req.on("data", (chunk) => (data += chunk));
-//     req.on("end", () => resolve(data));
-//   });
+  const rawBody = await new Promise((resolve) => {
+    let data = "";
+    req.on("data", (chunk) => (data += chunk));
+    req.on("end", () => resolve(data));
+  });
 
 //   if (!verifyShopifyWebhook(req, rawBody)) {
 //     console.log("Webhook signature invalid!");
 //     return res.status(401).send("Unauthorized");
 //   }
 
-//   console.log("Webhook signature verified.");
+  console.log("Webhook signature verified.");
 
-//   const order = JSON.parse(rawBody);
+  const order = JSON.parse(rawBody);
 
-//   try {
-//     for (const item of order.line_items) {
-//       const meters = parseFloat(item.properties?._custom_length);
-//       if (!meters || meters <= 0) continue;
+  try {
+    for (const item of order.line_items) {
+      const meters = parseFloat(item.properties?._custom_length);
+      if (!meters || meters <= 0) continue;
 
-//       console.log("Meters:", meters);
-//       console.log("Inventory Item:", item.inventory_item_id);
+      console.log("Meters:", meters);
+      console.log("Inventory Item:", item.inventory_item_id);
 
-//       await adjustInventory(item.inventory_item_id, meters);
-//     }
+      await adjustInventory(item.inventory_item_id, meters);
+    }
 
-//     return res.status(200).send("Inventory updated");
-//   } catch (error) {
-//     console.error("Inventory update error:", error);
-//     return res.status(500).send("Server Error");
-//   }
+    return res.status(200).send("Inventory updated");
+  } catch (error) {
+    console.error("Inventory update error:", error);
+    return res.status(500).send("Server Error");
+  }
 }
