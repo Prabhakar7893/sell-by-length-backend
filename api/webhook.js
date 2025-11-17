@@ -3,21 +3,22 @@ import fetch from "node-fetch";
 
 function verifyShopifyWebhook(req, rawBody) {
   const hmacHeader = req.headers["x-shopify-hmac-sha256"];
+
   const hash = crypto
     .createHmac("sha256", process.env.WEBHOOK_SECRET)
     .update(rawBody, "utf8")
     .digest("base64");
 
   return crypto.timingSafeEqual(
-    Buffer.from(hmacHeader || "", "utf8"),
-    Buffer.from(hash || "", "utf8")
+    Buffer.from(hmacHeader || "", "base64"),
+    Buffer.from(hash || "", "base64")
   );
 }
 
 async function adjustInventory(inventoryItemId, metersSold) {
   const endpoint = `https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/inventory_levels/adjust.json`;
 
-  await fetch(endpoint, {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN,
@@ -26,12 +27,14 @@ async function adjustInventory(inventoryItemId, metersSold) {
     body: JSON.stringify({
       inventory_item_id: inventoryItemId,
       location_id: process.env.LOCATION_ID,
-      available_adjustment: -metersSold
+      available_adjustment: -metersSold,
     }),
   });
 
   const data = await response.text();
   console.log("Inventory API Response:", data);
+
+  return data;
 }
 
 export default async function handler(req, res) {
@@ -45,23 +48,26 @@ export default async function handler(req, res) {
     req.on("end", () => resolve(data));
   });
 
+  // Verify webhook
   if (!verifyShopifyWebhook(req, rawBody)) {
+    console.log("❌ Webhook verification failed");
     return res.status(401).send("Unauthorized");
   }
+
+  console.log("✔ Webhook verified");
 
   const order = JSON.parse(rawBody);
 
   try {
     for (const item of order.line_items) {
       const meters = parseFloat(item.properties?._custom_meter);
+
       if (!meters || meters <= 0) continue;
 
-      const inventoryItemId = item.inventory_item_id;
       console.log("Inventory Item ID:", item.inventory_item_id);
+      console.log(`Reducing by ${meters} meters...`);
 
-
-      console.log(`Reducing stock of ${inventoryItemId} by ${meters} meters...`);
-      await adjustInventory(inventoryItemId, meters);
+      await adjustInventory(item.inventory_item_id, meters);
     }
 
     return res.status(200).send("Inventory updated");
